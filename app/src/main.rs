@@ -23,7 +23,7 @@
 #![cfg_attr(all(test, feature = "bench"), feature(test))]
 
 #[macro_use]
-extern crate alacritty;
+extern crate alacritty_core;
 
 #[macro_use]
 extern crate log;

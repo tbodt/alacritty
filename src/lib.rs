@@ -30,10 +30,6 @@
 #[cfg(any(target_os = "linux", target_os = "freebsd", target_os="dragonfly", target_os="openbsd"))]
 extern crate x11_dl;
 
-#[cfg(target_os = "macos")]
-#[macro_use]
-extern crate objc;
-
 extern crate arraydeque;
 extern crate cgmath;
 extern crate copypasta;
@@ -41,7 +37,6 @@ extern crate errno;
 extern crate env_logger;
 extern crate fnv;
 extern crate font;
-extern crate glutin;
 extern crate libc;
 extern crate mio;
 extern crate mio_more;
@@ -62,12 +57,10 @@ pub mod ansi;
 pub mod cli;
 pub mod config;
 pub mod display;
-pub mod event;
 pub mod event_loop;
 pub mod grid;
 pub mod index;
 pub mod input;
-pub mod locale;
 pub mod logging;
 pub mod meter;
 pub mod renderer;
@@ -76,7 +69,6 @@ pub mod sync;
 pub mod term;
 pub mod tty;
 pub mod util;
-pub mod window;
 
 use std::ops::Mul;
 
