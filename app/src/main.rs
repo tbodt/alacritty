@@ -163,7 +163,7 @@ fn run(mut config: Config, options: &cli::Options) -> Result<(), Box<Error>> {
     //
     // Need the Rc<RefCell<_>> here since a ref is shared in the resize callback
     let mut processor = event::Processor::new(
-        event_loop::Notifier(event_loop.channel()),
+        event_loop.channel(),
         display.resize_channel(),
         options,
         &config,

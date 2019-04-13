@@ -22,16 +22,8 @@ use util::limit;
 use util::fmt::Red;
 use window::Window;
 
-/// Byte sequences are sent to a `Notify` in response to some events
-pub trait Notify {
-    /// Notify that an escape sequence should be written to the pty
-    ///
-    /// TODO this needs to be able to error somehow
-    fn notify<B: Into<Cow<'static, [u8]>>>(&mut self, B);
-}
-
-pub struct ActionContext<'a, N: 'a> {
-    pub notifier: &'a mut N,
+pub struct ActionContext<'a> {
+    pub notifier: &'a mut Sender<Msg>,
     pub terminal: &'a mut Term,
     pub selection: &'a mut Option<Selection>,
     pub size_info: &'a SizeInfo,
@@ -42,9 +34,16 @@ pub struct ActionContext<'a, N: 'a> {
     pub last_modifiers: &'a mut ModifiersState,
 }
 
-impl<'a, N: Notify + 'a> input::ActionContext for ActionContext<'a, N> {
-    fn write_to_pty<B: Into<Cow<'static, [u8]>>>(&mut self, val: B) {
-        self.notifier.notify(val);
+impl<'a> input::ActionContext for ActionContext<'a> {
+    fn write_to_pty<B: Into<Cow<'static, [u8]>>>(&mut self, bytes: B) {
+        let bytes = bytes.into();
+        // terminal hangs if we send 0 bytes through.
+        if bytes.len() == 0) {
+            return
+        }
+        if self.notifier.send(Msg::Input(bytes)).is_err() {
+            panic!("expected send event loop msg");
+        }
     }
 
     fn terminal_mode(&self) -> TermMode {
@@ -188,7 +187,7 @@ pub struct Processor<N> {
     mouse_config: config::Mouse,
     print_events: bool,
     wait_for_event: bool,
-    notifier: N,
+    notifier: Sender<Msg>,
     mouse: Mouse,
     resize_tx: mpsc::Sender<(u32, u32)>,
     ref_test: bool,
@@ -212,13 +211,13 @@ impl<N> OnResize for Processor<N> {
     }
 }
 
-impl<N: Notify> Processor<N> {
+impl Processor {
     /// Create a new event processor
     ///
     /// Takes a writer which is expected to be hooked up to the write end of a
     /// pty.
     pub fn new(
-        notifier: N,
+        notifier: Sender<Msg>,
         resize_tx: mpsc::Sender<(u32, u32)>,
         options: &Options,
         config: &Config,

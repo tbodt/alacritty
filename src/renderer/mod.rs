@@ -29,9 +29,9 @@ use gl;
 use index::{Line, Column, RangeInclusive};
 use notify::{Watcher, watcher, RecursiveMode, DebouncedEvent};
 
-use config::{self, Config, Delta};
+use config::{self, Config};
 use term::{self, cell, RenderableCell};
-use window::{Size, Pixels};
+use display::{Size, Pixels, Offset};
 
 use Rgb;
 
@@ -165,7 +165,7 @@ pub struct GlyphCache {
     font_size: font::Size,
 
     /// glyph offset
-    glyph_offset: Delta<i8>,
+    glyph_offset: Offset<i8>,
 
     metrics: ::font::Metrics,
 }
@@ -736,7 +736,7 @@ impl QuadRenderer {
 
 impl<'a> RenderApi<'a> {
     pub fn clear(&self, color: Rgb) {
-        let alpha = self.config.background_opacity().get();
+        let alpha = self.config.background_opacity;
         unsafe {
             gl::ClearColor(
                 (self.visual_bell_intensity + f32::from(color.r) / 255.0).min(1.0) * alpha,
@@ -1017,8 +1017,8 @@ impl ShaderProgram {
             u_cell_dim: cell_dim,
             u_visual_bell: visual_bell,
             u_background: background,
-            padding_x: config.padding().x,
-            padding_y: config.padding().y,
+            padding_x: config.padding.x,
+            padding_y: config.padding.y,
         };
 
         shader.update_projection(*size.width as f32, *size.height as f32);

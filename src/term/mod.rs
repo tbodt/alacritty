@@ -24,10 +24,11 @@ use unicode_width::UnicodeWidthChar;
 
 use font::{self, Size};
 use ansi::{self, Color, NamedColor, Attr, Handler, CharsetIndex, StandardCharset, CursorStyle};
+use display::Offset;
 use grid::{BidirectionalIterator, Grid, ClearRegion, ToRange, Indexed};
 use index::{self, Point, Column, Line, Linear, IndexRange, Contains, RangeInclusive};
 use selection::{self, Span, Selection};
-use config::{Config, VisualBellAnimation};
+use config::Config;
 use {MouseCursor, Rgb};
 use copypasta::{Clipboard, Load, Store};
 
@@ -168,7 +169,7 @@ impl<'a> RenderableCellsIter<'a> {
     }
 
     fn populate_block_cursor(&mut self) {
-        let (text_color, cursor_color) = if self.config.custom_cursor_colors() {
+        let (text_color, cursor_color) = if self.config.custom_cursor_colors {
             (
                 Color::Named(NamedColor::CursorText),
                 Color::Named(NamedColor::Cursor)
@@ -223,7 +224,7 @@ impl<'a> RenderableCellsIter<'a> {
     }
 
     fn text_cursor_color(&self, cell: &Cell) -> Color {
-        if self.config.custom_cursor_colors() {
+        if self.config.custom_cursor_colors {
             Color::Named(NamedColor::Cursor)
         } else {
             // Cursor is same color as text
@@ -273,7 +274,7 @@ impl<'a> RenderableCellsIter<'a> {
         match *fg {
             Color::Spec(rgb) => rgb,
             Color::Named(ansi) => {
-                match (self.config.draw_bold_text_with_bright_colors(), cell.flags & Flags::DIM_BOLD) {
+                match (self.config.draw_bold_text_with_bright_colors, cell.flags & Flags::DIM_BOLD) {
                     // Draw bold text in bright colors *and* contains bold flag.
                     (true, self::cell::Flags::DIM_BOLD) |
                     (true, self::cell::Flags::BOLD)     => self.colors[ansi.to_bright()],
@@ -285,7 +286,7 @@ impl<'a> RenderableCellsIter<'a> {
             },
             Color::Indexed(idx) => {
                 let idx = match (
-                    self.config.draw_bold_text_with_bright_colors(),
+                    self.config.draw_bold_text_with_bright_colors,
                     cell.flags & Flags::DIM_BOLD,
                     idx
                 ) {
@@ -526,15 +527,48 @@ pub struct Cursor {
     charsets: Charsets,
 }
 
+/// `VisualBellAnimations` are modeled after a subset of CSS transitions and Robert
+/// Penner's Easing Functions.
+#[derive(Clone, Copy, Debug, Deserialize)]
+pub enum VisualBellAnimation {
+    Ease,          // CSS
+    EaseOut,       // CSS
+    EaseOutSine,   // Penner
+    EaseOutQuad,   // Penner
+    EaseOutCubic,  // Penner
+    EaseOutQuart,  // Penner
+    EaseOutQuint,  // Penner
+    EaseOutExpo,   // Penner
+    EaseOutCirc,   // Penner
+    Linear,
+}
+
+impl Default for VisualBellAnimation {
+    fn default() -> Self {
+        VisualBellAnimation::EaseOutExpo
+    }
+}
+
+#[derive(Debug)]
 pub struct VisualBell {
     /// Visual bell animation
-    animation: VisualBellAnimation,
+    pub animation: VisualBellAnimation,
 
     /// Visual bell duration
-    duration: Duration,
+    pub duration: Duration,
 
     /// The last time the visual bell rang, if at all
     start_time: Option<Instant>,
+}
+
+impl Default for VisualBell {
+    fn default() -> Self {
+        VisualBell {
+            animation: VisualBellAnimation::EaseOutExpo,
+            duration: Duration::from_millis(150),
+            start_time: None,
+        }
+    }
 }
 
 fn cubic_bezier(p0: f64, p1: f64, p2: f64, p3: f64, x: f64) -> f64 {
@@ -545,15 +579,6 @@ fn cubic_bezier(p0: f64, p1: f64, p2: f64, p3: f64, x: f64) -> f64 {
 }
 
 impl VisualBell {
-    pub fn new(config: &Config) -> VisualBell {
-        let visual_bell_config = config.visual_bell();
-        VisualBell {
-            animation: visual_bell_config.animation(),
-            duration: visual_bell_config.duration(),
-            start_time: None,
-        }
-    }
-
     /// Ring the visual bell, and return its intensity.
     pub fn ring(&mut self) -> f64 {
         let now = Instant::now();
@@ -639,9 +664,8 @@ impl VisualBell {
     }
 
     pub fn update_config(&mut self, config: &Config) {
-        let visual_bell_config = config.visual_bell();
-        self.animation = visual_bell_config.animation();
-        self.duration = visual_bell_config.duration();
+        self.animation = config.visual_bell.animation;
+        self.duration = config.visual_bell.duration;
     }
 }
 
@@ -743,28 +767,25 @@ pub struct SizeInfo {
     pub cell_height: f32,
 
     /// Horizontal window padding
-    pub padding_x: f32,
-
-    /// Horizontal window padding
-    pub padding_y: f32,
+    pub padding: Offset<f32>,
 }
 
 impl SizeInfo {
     #[inline]
     pub fn lines(&self) -> Line {
-        Line(((self.height - 2. * self.padding_y) / self.cell_height) as usize)
+        Line(((self.height - 2. * self.padding.y) / self.cell_height) as usize)
     }
 
     #[inline]
     pub fn cols(&self) -> Column {
-        Column(((self.width - 2. * self.padding_x) / self.cell_width) as usize)
+        Column(((self.width - 2. * self.padding.x) / self.cell_width) as usize)
     }
 
     fn contains_point(&self, x: usize, y:usize) -> bool {
-        x <= (self.width - self.padding_x) as usize &&
-            x >= self.padding_x as usize &&
+        x <= (self.width - self.padding.x) as usize &&
+            x >= self.padding.x as usize &&
             y <= (self.height - self.padding_y) as usize &&
-            y >= self.padding_y as usize
+            y >= self.padding.y as usize
     }
 
     pub fn pixels_to_coords(&self, x: usize, y: usize) -> Option<Point> {
@@ -772,8 +793,8 @@ impl SizeInfo {
             return None;
         }
 
-        let col = Column((x - self.padding_x as usize) / (self.cell_width as usize));
-        let line = Line((y - self.padding_y as usize) / (self.cell_height as usize));
+        let col = Column((x - self.padding.x as usize) / (self.cell_width as usize));
+        let line = Line((y - self.padding.y as usize) / (self.cell_height as usize));
 
         Some(Point {
             line: min(line, self.lines() - 1),
@@ -802,7 +823,7 @@ impl Term {
 
         let grid = Grid::new(num_lines, num_cols, &template);
 
-        let tabspaces = config.tabspaces();
+        let tabspaces = config.tabspaces;
         let tabs = IndexRange::from(Column(0)..grid.num_cols())
             .map(|i| (*i as usize) % tabspaces == 0)
             .collect::<Vec<bool>>();
@@ -814,14 +835,14 @@ impl Term {
             next_title: None,
             next_mouse_cursor: None,
             dirty: false,
-            visual_bell: VisualBell::new(config),
+            visual_bell: config.visual_bell,
             next_is_urgent: None,
             input_needs_wrap: false,
             grid,
             alt_grid: alt,
             alt: false,
-            font_size: config.font().size(),
-            original_font_size: config.font().size(),
+            font_size: config.font.size(),
+            original_font_size: config.font.size(),
             active_charset: Default::default(),
             cursor: Default::default(),
             cursor_save: Default::default(),
@@ -830,13 +851,13 @@ impl Term {
             mode: Default::default(),
             scroll_region,
             size_info: size,
-            colors: color::List::from(config.colors()),
+            colors: color::List::from(&config.colors),
             color_modified: [false; color::COUNT],
-            original_colors: color::List::from(config.colors()),
-            semantic_escape_chars: config.selection().semantic_escape_chars.clone(),
+            original_colors: color::List::from(&config.colors),
+            semantic_escape_chars: config.semantic_escape_chars.clone(),
             cursor_style: None,
-            default_cursor_style: config.cursor_style(),
-            dynamic_title: config.dynamic_title(),
+            default_cursor_style: config.cursor_style,
+            dynamic_title: config.dynamic_title,
             tabspaces,
         }
     }
@@ -854,16 +875,16 @@ impl Term {
     }
 
     pub fn update_config(&mut self, config: &Config) {
-        self.semantic_escape_chars = config.selection().semantic_escape_chars.clone();
-        self.original_colors.fill_named(config.colors());
+        self.semantic_escape_chars = config.semantic_escape_chars.clone();
+        self.original_colors.fill_named(&config.colors);
         for i in 0..color::COUNT {
             if !self.color_modified[i] {
                 self.colors[i] = self.original_colors[i];
             }
         }
         self.visual_bell.update_config(config);
-        self.default_cursor_style = config.cursor_style();
-        self.dynamic_title = config.dynamic_title();
+        self.default_cursor_style = config.cursor_style;
+        self.dynamic_title = config.dynamic_title;
     }
 
     #[inline]

@@ -23,9 +23,9 @@
 #![cfg_attr(all(test, feature = "bench"), feature(test))]
 
 #[macro_use] extern crate bitflags;
-#[macro_use] extern crate clap;
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
+#[macro_use] extern crate smart_default;
 
 #[cfg(any(target_os = "linux", target_os = "freebsd", target_os="dragonfly", target_os="openbsd"))]
 extern crate x11_dl;
@@ -43,8 +43,8 @@ extern crate mio_more;
 extern crate notify;
 extern crate parking_lot;
 extern crate serde;
+#[cfg(test)]
 extern crate serde_json;
-extern crate serde_yaml;
 extern crate unicode_width;
 extern crate vte;
 extern crate xdg;
@@ -54,7 +54,6 @@ extern crate base64;
 pub mod macros;
 
 pub mod ansi;
-pub mod cli;
 pub mod config;
 pub mod display;
 pub mod event_loop;

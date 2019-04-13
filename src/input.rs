@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-//! Handle input from glutin
+//! Handle input
 //!
 //! Certain key combinations should send some escape sequence back to the pty.
 //! In order to figure that out, state about which modifier keys are pressed
@@ -25,7 +25,7 @@ use std::time::Instant;
 use std::os::unix::process::CommandExt;
 
 use copypasta::{Clipboard, Load, Buffer};
-use glutin::{ElementState, VirtualKeyCode, MouseButton, TouchPhase, MouseScrollDelta, ModifiersState};
+use glutin::{ElementState, MouseButton, TouchPhase, MouseScrollDelta, ModifiersState};
 
 use config;
 use event::{ClickState, Mouse};

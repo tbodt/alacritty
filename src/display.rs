@@ -14,25 +14,24 @@
 
 //! The display subsystem including window management, font rasterization, and
 //! GPU drawing.
+
+use std::ops::Deref;
+use std::fmt;
 use std::sync::mpsc;
 
 use parking_lot::{MutexGuard};
 
 use Rgb;
-use config::{self, Config};
+use config::Config;
 use font::{self, Rasterize};
+use index::{Column, Line};
 use meter::Meter;
 use renderer::{self, GlyphCache, QuadRenderer};
 use selection::Selection;
 use term::{Term, SizeInfo};
 
-use window::{self, Size, Pixels};
-
 #[derive(Debug)]
-pub enum Error {
-    /// Error with window management
-    Window(window::Error),
-
+enum Error {
     /// Error dealing with fonts
     Font(font::Error),
 
@@ -43,7 +42,6 @@ pub enum Error {
 impl ::std::error::Error for Error {
     fn cause(&self) -> Option<&::std::error::Error> {
         match *self {
-            Error::Window(ref err) => Some(err),
             Error::Font(ref err) => Some(err),
             Error::Render(ref err) => Some(err),
         }
@@ -51,7 +49,6 @@ impl ::std::error::Error for Error {
 
     fn description(&self) -> &str {
         match *self {
-            Error::Window(ref err) => err.description(),
             Error::Font(ref err) => err.description(),
             Error::Render(ref err) => err.description(),
         }
@@ -61,16 +58,9 @@ impl ::std::error::Error for Error {
 impl ::std::fmt::Display for Error {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         match *self {
-            Error::Window(ref err) => err.fmt(f),
             Error::Font(ref err) => err.fmt(f),
             Error::Render(ref err) => err.fmt(f),
         }
-    }
-}
-
-impl From<window::Error> for Error {
-    fn from(val: window::Error) -> Error {
-        Error::Window(val)
     }
 }
 
@@ -86,7 +76,122 @@ impl From<renderer::Error> for Error {
     }
 }
 
-/// The display wraps a window, font rasterizer, and GPU renderer
+/// Size of a window
+#[derive(Debug, Copy, Clone)]
+pub struct Size<T> {
+    pub width: T,
+    pub height: T,
+}
+
+/// Strongly typed Pixels unit
+#[derive(Debug, Copy, Clone)]
+pub struct Pixels<T>(pub T);
+
+/// Strongly typed Points unit
+///
+/// Points are like pixels but adjusted for DPI.
+#[derive(Debug, Copy, Clone)]
+pub struct Points<T>(pub T);
+
+pub trait ToPoints {
+    fn to_points(&self, scale: f32) -> Size<Points<u32>>;
+}
+
+impl ToPoints for Size<Points<u32>> {
+    #[inline]
+    fn to_points(&self, _scale: f32) -> Size<Points<u32>> {
+        *self
+    }
+}
+
+impl ToPoints for Size<Pixels<u32>> {
+    fn to_points(&self, scale: f32) -> Size<Points<u32>> {
+        let width_pts = (*self.width as f32 / scale) as u32;
+        let height_pts = (*self.height as f32 / scale) as u32;
+
+        Size {
+            width: Points(width_pts),
+            height: Points(height_pts)
+        }
+    }
+}
+
+impl<T: fmt::Display> fmt::Display for Size<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} × {}", self.width, self.height)
+    }
+}
+
+macro_rules! deref_newtype {
+    ($($src:ty),+) => {
+        $(
+        impl<T> Deref for $src {
+            type Target = T;
+
+            #[inline]
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
+        }
+        )+
+    }
+}
+
+deref_newtype! { Points<T>, Pixels<T> }
+
+
+impl<T: fmt::Display> fmt::Display for Pixels<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}px", self.0)
+    }
+}
+
+impl<T: fmt::Display> fmt::Display for Points<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}pts", self.0)
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct Offset<T: Copy + Clone> {
+    pub x: T,
+    pub y: T,
+}
+
+/// Window Dimensions
+///
+/// Newtype to avoid passing values incorrectly
+#[derive(Debug, Copy, Clone)]
+pub struct Dimensions {
+    /// Window width in character columns
+    columns: Column,
+
+    /// Window Height in character lines
+    lines: Line,
+}
+
+impl Dimensions {
+    pub fn new(columns: Column, lines: Line) -> Self {
+        Dimensions {
+            columns,
+            lines,
+        }
+    }
+
+    /// Get lines
+    #[inline]
+    pub fn lines_u32(&self) -> u32 {
+        self.lines.0 as u32
+    }
+
+    /// Get columns
+    #[inline]
+    pub fn columns_u32(&self) -> u32 {
+        self.columns.0 as u32
+    }
+}
+
+/// The display wraps a font rasterizer and GPU renderer
 pub struct Display {
     renderer: QuadRenderer,
     glyph_cache: GlyphCache,
@@ -104,7 +209,7 @@ pub trait OnResize {
 }
 
 pub enum InitialSize {
-    Cells(config::Dimensions),
+    Cells(Dimensions),
     Pixels(Size<Pixels<u32>>),
 }
 
@@ -138,8 +243,8 @@ impl Display {
                 let width = cell_width as u32 * dimensions.columns_u32();
                 let height = cell_height as u32 * dimensions.lines_u32();
                 Size {
-                    width: Pixels(width + 2 * config.padding().x as u32),
-                    height: Pixels(height + 2 * config.padding().y as u32),
+                    width: Pixels(width + 2 * config.padding.x as u32),
+                    height: Pixels(height + 2 * config.padding.y as u32),
                 }
             },
             InitialSize::Pixels(size) => size,
@@ -152,8 +257,7 @@ impl Display {
             height: size.height.0 as f32,
             cell_width: cell_width as f32,
             cell_height: cell_height as f32,
-            padding_x: config.padding().x as f32,
-            padding_y: config.padding().y as f32,
+            padding: config.padding,
         };
 
         // Channel for resize events

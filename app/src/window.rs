@@ -13,7 +13,6 @@
 // limitations under the License.
 use std::convert::From;
 use std::fmt::{self, Display};
-use std::ops::Deref;
 
 use gl;
 use glutin::{self, ContextBuilder, ControlFlow, CursorState, Event, EventsLoop,
@@ -67,82 +66,6 @@ pub struct DeviceProperties {
     /// This will be 1. on standard displays and may have a different value on
     /// hidpi displays.
     pub scale_factor: f32,
-}
-
-/// Size of the window
-#[derive(Debug, Copy, Clone)]
-pub struct Size<T> {
-    pub width: T,
-    pub height: T,
-}
-
-/// Strongly typed Pixels unit
-#[derive(Debug, Copy, Clone)]
-pub struct Pixels<T>(pub T);
-
-/// Strongly typed Points unit
-///
-/// Points are like pixels but adjusted for DPI.
-#[derive(Debug, Copy, Clone)]
-pub struct Points<T>(pub T);
-
-pub trait ToPoints {
-    fn to_points(&self, scale: f32) -> Size<Points<u32>>;
-}
-
-impl ToPoints for Size<Points<u32>> {
-    #[inline]
-    fn to_points(&self, _scale: f32) -> Size<Points<u32>> {
-        *self
-    }
-}
-
-impl ToPoints for Size<Pixels<u32>> {
-    fn to_points(&self, scale: f32) -> Size<Points<u32>> {
-        let width_pts = (*self.width as f32 / scale) as u32;
-        let height_pts = (*self.height as f32 / scale) as u32;
-
-        Size {
-            width: Points(width_pts),
-            height: Points(height_pts)
-        }
-    }
-}
-
-impl<T: Display> Display for Size<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} × {}", self.width, self.height)
-    }
-}
-
-macro_rules! deref_newtype {
-    ($($src:ty),+) => {
-        $(
-        impl<T> Deref for $src {
-            type Target = T;
-
-            #[inline]
-            fn deref(&self) -> &Self::Target {
-                &self.0
-            }
-        }
-        )+
-    }
-}
-
-deref_newtype! { Points<T>, Pixels<T> }
-
-
-impl<T: Display> Display for Pixels<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}px", self.0)
-    }
-}
-
-impl<T: Display> Display for Points<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}pts", self.0)
-    }
 }
 
 impl ::std::error::Error for Error {

@@ -13,15 +13,9 @@ use mio::unix::EventedFd;
 use mio_more::channel::{self, Sender, Receiver};
 
 use ansi;
-use event;
 use term::Term;
 use util::thread;
 use sync::FairMutex;
-
-
-pub trait WindowNotifier {
-    fn notify(&self);
-}
 
 /// Messages that may be sent to the `EventLoop`
 #[derive(Debug)]
@@ -83,21 +77,8 @@ pub struct State {
     parser: ansi::Processor,
 }
 
-pub struct Notifier(pub Sender<Msg>);
-
-impl event::Notify for Notifier {
-    fn notify<B>(&mut self, bytes: B)
-        where B: Into<Cow<'static, [u8]>>
-    {
-        let bytes = bytes.into();
-        // terminal hangs if we send 0 bytes through.
-        if bytes.len() == 0 {
-            return
-        }
-        if self.0.send(Msg::Input(bytes)).is_err() {
-            panic!("expected send event loop msg");
-        }
-    }
+pub trait WindowNotifier {
+    fn notify(&self);
 }
 
 

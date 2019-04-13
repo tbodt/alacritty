@@ -20,7 +20,6 @@
 use log;
 use std::sync;
 use std::io;
-use cli;
 
 pub struct Logger<T> {
     level: log::LevelFilter,
@@ -55,12 +54,12 @@ impl<T: Send + io::Write> log::Log for Logger<T> {
     fn flush(&self) {}
 }
 
-pub fn initialize(options: &cli::Options) -> Result<(), log::SetLoggerError> {
+pub fn initialize(log_level: &log::LevelFilter) -> Result<(), log::SetLoggerError> {
     // Use env_logger if RUST_LOG environment variable is defined. Otherwise,
     // use the alacritty-only logger.
     if ::std::env::var("RUST_LOG").is_ok() {
         ::env_logger::try_init()
     } else {
-        log::set_boxed_logger(Box::new(Logger::new(io::stdout(), options.log_level)))
+        log::set_boxed_logger(Box::new(Logger::new(io::stdout(), log_level)))
     }
 }
