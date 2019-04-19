@@ -1,66 +1,16 @@
-[package]
-name = "alacritty"
-version = "0.3.0"
-license = "Apache-2.0"
-edition = "2018"
-description = "GPU-accelerated terminal emulator"
-
-readme = "README.md"
-authors = ["Joe Wilm <joe@jwilm.com>"]
-repository = "https://github.com/jwilm/alacritty"
-categories = ["emulators", "text-processing"]
-keywords = ["alacritty", "terminal", "term", "emulator", "opengl"]
-
 [workspace]
 members = [
     "alacritty_terminal",
+    "alacritty",
     "copypasta",
     "winpty",
     "font",
 ]
 
-[dependencies]
-alacritty_terminal = { path = "./alacritty_terminal" }
-crossbeam-channel = "0.3.8"
-env_logger = "0.6.0"
-time = "0.1.42"
-log = "0.4.6"
-
-[dev-dependencies]
-serde = "1"
-serde_json = "1"
-serde_derive = "1"
-
-[features]
-default = []
-# Enabling this feature makes shaders automatically reload when changed
-live-shader-reload = ["alacritty_terminal/live-shader-reload"]
-bench = []
-
 [profile.release]
 lto = true
 debug = 1
 incremental = false
-
-[package.metadata.deb]
-maintainer = "Joe Wilm <joe@jwilm.com>"
-license-file = ["LICENSE-APACHE", "3"]
-extended-description = """\
-Alacritty is the fastest terminal emulator in existence. Using the GPU for \
-rendering enables optimizations that simply aren't possible without it.  """
-depends = "$auto"
-section = "rust"
-priority = "optional"
-assets = [
-    ["target/release/alacritty", "usr/bin/", "755"],
-    ["extra/linux/alacritty.desktop", "usr/share/applications/", "644"],
-    ["extra/logo/alacritty-term.svg", "usr/share/pixmaps/Alacritty.svg", "644"],
-    ["extra/completions/alacritty.bash", "usr/share/bash-completion/completions/alacritty", "644"],
-    ["extra/completions/alacritty.fish", "usr/share/fish/completions/alacritty.fish", "644"],
-    ["extra/completions/_alacritty", "usr/share/zsh/vendor-completions/_alacritty", "644"],
-    ["extra/alacritty.info", "usr/share/terminfo/a/alacritty", "644"],
-]
-maintainer-scripts = "extra/linux/debian"
 
 [patch.crates-io]
 servo-freetype-sys = { path = "servo-freetype-proxy" }
