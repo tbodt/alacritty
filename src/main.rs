@@ -16,19 +16,12 @@
 #![deny(clippy::all, clippy::if_not_else, clippy::enum_glob_use, clippy::wrong_pub_self_convention)]
 #![cfg_attr(feature = "nightly", feature(core_intrinsics))]
 #![cfg_attr(all(test, feature = "bench"), feature(test))]
+
 // With the default subsystem, 'console', windows creates an additional console
 // window for the program.
 // This is silently ignored on non-windows systems.
 // See https://msdn.microsoft.com/en-us/library/4cc7ya5b.aspx for more details.
 #![windows_subsystem = "windows"]
-
-#[cfg(target_os = "macos")]
-use dirs;
-
-#[cfg(windows)]
-use winapi::um::wincon::{AttachConsole, FreeConsole, ATTACH_PARENT_PROCESS};
-
-use log::{error, info};
 
 use std::error::Error;
 use std::fs;
@@ -41,19 +34,28 @@ use std::env;
 #[cfg(not(windows))]
 use std::os::unix::io::AsRawFd;
 
-use alacritty::config::{self, Config, Monitor};
-use alacritty::display::Display;
-use alacritty::event_loop::{self, EventLoop, Msg};
 #[cfg(target_os = "macos")]
-use alacritty::locale;
-use alacritty::logging;
-use alacritty::message_bar::MessageBuffer;
-use alacritty::panic;
-use alacritty::sync::FairMutex;
-use alacritty::term::Term;
-use alacritty::tty;
-use alacritty::util::fmt::Red;
-use alacritty::{cli, die, event};
+use dirs;
+
+#[cfg(windows)]
+use winapi::um::wincon::{AttachConsole, FreeConsole, ATTACH_PARENT_PROCESS};
+
+use log::{error, info};
+
+use alacritty_terminal::config::{self, Config, Monitor};
+use alacritty_terminal::display::Display;
+use alacritty_terminal::event_loop::{self, EventLoop, Msg};
+#[cfg(target_os = "macos")]
+use alacritty_terminal::locale;
+use alacritty_terminal::message_bar::MessageBuffer;
+use alacritty_terminal::panic;
+use alacritty_terminal::sync::FairMutex;
+use alacritty_terminal::term::Term;
+use alacritty_terminal::tty;
+use alacritty_terminal::util::fmt::Red;
+use alacritty_terminal::{cli, die, event};
+
+mod logging;
 
 fn main() {
     panic::attach_handler();

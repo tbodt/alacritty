@@ -15,16 +15,6 @@ if [ "$RUSTFMT" == "true" ]; then
     exit
 fi
 
-# Run test in release mode if a tag is present, to produce an optimized binary
-if [ -n "$TRAVIS_TAG" ]; then
-    cargo test --release || error=true
-else
-    cargo test || error=true
-fi
-
-# Test the font subcrate
-cargo test -p font || error=true
-
 # Test the winpty subcrate
 if [ "$TRAVIS_OS_NAME" == "windows" ]; then
     if [ -n "$TRAVIS_TAG" ]; then
@@ -33,7 +23,13 @@ if [ "$TRAVIS_OS_NAME" == "windows" ]; then
     else
         cp "./target/debug/winpty-agent.exe" "./target/debug/deps"
     fi
-    cargo test -p winpty || error=true
+fi
+
+# Run test in release mode if a tag is present, to produce an optimized binary
+if [ -n "$TRAVIS_TAG" ]; then
+    cargo test --all --release || error=true
+else
+    cargo test --all || error=true
 fi
 
 if [ $error == "true" ]; then
